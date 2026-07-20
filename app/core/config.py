@@ -1,0 +1,31 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """
+    Central place for all configuration. Never read os.getenv() directly
+    elsewhere in the app — import `settings` from here instead.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # App
+    secret_key: str = "change-me"
+    access_token_expire_minutes: int = 60
+    environment: str = "development"
+
+    # Database
+    database_url: str = "sqlite:///./dev.db"
+
+    # Anthropic (Phase 4+)
+    anthropic_api_key: str = ""
+
+    # Company policy placeholders — confirm real values with the business
+    # before relying on these in the chatbot (Phase 5/6).
+    office_open_time: str = "09:00"
+    office_close_time: str = "18:00"
+    working_days: str = "Mon,Tue,Wed,Thu,Fri"
+    annual_vacation_days: int = 21
+
+
+settings = Settings()
