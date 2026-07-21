@@ -11,6 +11,7 @@ class EmployeeCreate(BaseModel):
     password: str
     hire_date: date
     role: Role = Role.employee
+    expected_daily_hours: float = 8.0
 
 
 class EmployeeOut(BaseModel):
@@ -18,6 +19,7 @@ class EmployeeOut(BaseModel):
     full_name: str
     email: EmailStr
     role: Role
+    expected_daily_hours: float
     hire_date: date
     created_at: datetime
 

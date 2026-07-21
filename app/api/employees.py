@@ -24,6 +24,7 @@ def create_employee(payload: EmployeeCreate, db: Session = Depends(get_db)):
         hashed_password=hash_password(payload.password),
         hire_date=payload.hire_date,
         role=payload.role,
+        expected_daily_hours=payload.expected_daily_hours,
     )
     db.add(employee)
     db.commit()

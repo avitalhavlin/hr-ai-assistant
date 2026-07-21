@@ -12,6 +12,7 @@ def _make_employee(db):
         hashed_password="x",
         hire_date=date(2024, 1, 1),
         role=Role.employee,
+        expected_daily_hours=8.0,
     )
     db.add(employee)
     db.commit()
