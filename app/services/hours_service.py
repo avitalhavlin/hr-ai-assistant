@@ -34,26 +34,26 @@ def _iso_week_range(year: int, week: int) -> tuple[date, date]:
     return monday, sunday
 
 
-def get_hours_for_week(db: Session, employee_id: int, year: int, week: int) -> float:
+def get_hours_for_week(db: Session, user_id: int, year: int, week: int) -> float:
     start, end = _iso_week_range(year, week)
-    return get_hours_between(db, employee_id, start, end)
+    return get_hours_between(db, user_id, start, end)
 
 
-def get_hours_for_month(db: Session, employee_id: int, year: int, month: int) -> float:
+def get_hours_for_month(db: Session, user_id: int, year: int, month: int) -> float:
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) - timedelta(days=1) if month == 12 else date(year, month + 1, 1) - timedelta(days=1)
-    return get_hours_between(db, employee_id, start, end)
+    return get_hours_between(db, user_id, start, end)
 
 
-def get_hours_for_year(db: Session, employee_id: int, year: int) -> float:
-    return get_hours_between(db, employee_id, date(year, 1, 1), date(year, 12, 31))
+def get_hours_for_year(db: Session, user_id: int, year: int) -> float:
+    return get_hours_between(db, user_id, date(year, 1, 1), date(year, 12, 31))
 
 
-def get_hours_between(db: Session, employee_id: int, start: date, end: date) -> float:
+def get_hours_between(db: Session, user_id: int, start: date, end: date) -> float:
     entries = (
         db.query(TimeEntry)
         .filter(
-            TimeEntry.employee_id == employee_id,
+            TimeEntry.user_id == user_id,
             TimeEntry.work_date >= start,
             TimeEntry.work_date <= end,
         )

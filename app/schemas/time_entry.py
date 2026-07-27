@@ -11,7 +11,7 @@ class TimeEntryCreate(BaseModel):
 
 class TimeEntryOut(BaseModel):
     id: int
-    employee_id: int
+    user_id: int
     work_date: date
     start_time: datetime
     end_time: datetime | None
