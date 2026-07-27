@@ -10,6 +10,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.vacation_request import VacationRequest, VacationStatus
+from app.services.update_utils import apply_updates
 
 
 def create_vacation_request(
@@ -36,6 +37,30 @@ def list_vacation_requests(db: Session, user_id: int) -> list[VacationRequest]:
         .filter(VacationRequest.user_id == user_id)
         .all()
     )
+
+
+def update_vacation_request(
+    db: Session, user_id: int, request_id: int, updates: dict
+) -> VacationRequest | None:
+    request = (
+        db.query(VacationRequest)
+        .filter(VacationRequest.id == request_id, VacationRequest.user_id == user_id)
+        .first()
+    )
+    if request is None:
+        return None
+
+    if request.status != VacationStatus.pending:
+        raise ValueError(f"Vacation request is already {request.status.value}")
+
+    apply_updates(request, updates)
+
+    if request.end_date < request.start_date:
+        raise ValueError("end_date must not be before start_date")
+
+    db.commit()
+    db.refresh(request)
+    return request
 
 
 def _get_pending_request(db: Session, request_id: int) -> VacationRequest:

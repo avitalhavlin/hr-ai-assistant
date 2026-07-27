@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.time_entry import TimeEntry
-from app.schemas.time_entry import HoursSummary, TimeEntryCreate, TimeEntryOut
-from app.services import hours_service
+from app.schemas.time_entry import HoursSummary, TimeEntryCreate, TimeEntryOut, TimeEntryUpdate
+from app.services import hours_service, time_entry_service
 
 router = APIRouter(prefix="/users/{user_id}/time-entries", tags=["time-entries"])
 
@@ -21,6 +21,20 @@ def create_time_entry(user_id: int, payload: TimeEntryCreate, db: Session = Depe
 @router.get("/", response_model=list[TimeEntryOut])
 def list_time_entries(user_id: int, db: Session = Depends(get_db)):
     return db.query(TimeEntry).filter(TimeEntry.user_id == user_id).all()
+
+
+@router.patch("/{entry_id}", response_model=TimeEntryOut)
+def update_time_entry(
+    user_id: int, entry_id: int, payload: TimeEntryUpdate, db: Session = Depends(get_db)
+):
+    updates = payload.model_dump(exclude_unset=True)
+    try:
+        entry = time_entry_service.update_time_entry(db, user_id, entry_id, updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Time entry not found")
+    return entry
 
 
 @router.get("/summary/week", response_model=HoursSummary)

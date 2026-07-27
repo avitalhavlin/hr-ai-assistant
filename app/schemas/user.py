@@ -12,6 +12,15 @@ class UserCreate(BaseModel):
     role: Role = Role.employee
 
 
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    email: EmailStr | None = None
+
+
+class UserRoleUpdate(BaseModel):
+    role: Role
+
+
 class UserOut(BaseModel):
     id: int
     full_name: str

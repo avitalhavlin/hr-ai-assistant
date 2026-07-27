@@ -10,6 +10,11 @@ class VacationRequestCreate(BaseModel):
     end_date: date
 
 
+class VacationRequestUpdate(BaseModel):
+    start_date: date | None = None
+    end_date: date | None = None
+
+
 class VacationRequestOut(BaseModel):
     id: int
     user_id: int

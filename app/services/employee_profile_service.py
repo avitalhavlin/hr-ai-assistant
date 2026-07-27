@@ -3,6 +3,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.employee_profile import EmployeeProfile
+from app.services.update_utils import apply_updates
 
 
 def create_profile(
@@ -12,7 +13,7 @@ def create_profile(
     expected_daily_hours: float,
     remaining_vacation_days: float,
 ) -> EmployeeProfile:
-    existing = db.query(EmployeeProfile).filter(EmployeeProfile.user_id == user_id).first()
+    existing = db.get(EmployeeProfile, user_id)
     if existing is not None:
         raise ValueError("Employee profile already exists for this user")
 
@@ -29,4 +30,16 @@ def create_profile(
 
 
 def get_profile(db: Session, user_id: int) -> EmployeeProfile | None:
-    return db.query(EmployeeProfile).filter(EmployeeProfile.user_id == user_id).first()
+    return db.get(EmployeeProfile, user_id)
+
+
+def update_profile(db: Session, user_id: int, updates: dict) -> EmployeeProfile | None:
+    profile = get_profile(db, user_id)
+    if profile is None:
+        return None
+
+    apply_updates(profile, updates)
+
+    db.commit()
+    db.refresh(profile)
+    return profile

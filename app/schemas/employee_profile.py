@@ -9,8 +9,13 @@ class EmployeeProfileCreate(BaseModel):
     remaining_vacation_days: float = 21.0
 
 
+class EmployeeProfileUpdate(BaseModel):
+    hire_date: date | None = None
+    expected_daily_hours: float | None = None
+    remaining_vacation_days: float | None = None
+
+
 class EmployeeProfileOut(BaseModel):
-    id: int
     user_id: int
     hire_date: date
     expected_daily_hours: float

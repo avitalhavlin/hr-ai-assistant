@@ -1,29 +1,17 @@
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.core.database import get_db
-from app.models.user import Role, User
-from app.schemas.vacation_request import VacationRequestCreate, VacationRequestOut
+from app.models.user import User
+from app.schemas.vacation_request import (
+    VacationRequestCreate,
+    VacationRequestOut,
+    VacationRequestUpdate,
+)
 from app.services import vacation_service
 
 router = APIRouter(tags=["vacation-requests"])
-
-# NOTE: real JWT-based auth lands in Phase 3. Until then, admin-only actions
-# are gated by an X-Admin-User-Id header identifying the acting user, which
-# must resolve to a user with the admin role. Replace this dependency with a
-# proper get_current_user()-based check in Phase 3.
-
-
-def require_admin(
-    x_admin_user_id: int = Header(..., alias="X-Admin-User-Id"),
-    db: Session = Depends(get_db),
-) -> User:
-    admin = db.get(User, x_admin_user_id)
-    if admin is None:
-        raise HTTPException(status_code=401, detail="Unknown acting user")
-    if admin.role != Role.admin:
-        raise HTTPException(status_code=403, detail="Admin role required")
-    return admin
 
 
 @router.post(
@@ -51,6 +39,23 @@ def create_vacation_request(
 )
 def list_vacation_requests(user_id: int, db: Session = Depends(get_db)):
     return vacation_service.list_vacation_requests(db, user_id)
+
+
+@router.patch(
+    "/users/{user_id}/vacation-requests/{request_id}",
+    response_model=VacationRequestOut,
+)
+def update_vacation_request(
+    user_id: int, request_id: int, payload: VacationRequestUpdate, db: Session = Depends(get_db)
+):
+    updates = payload.model_dump(exclude_unset=True)
+    try:
+        request = vacation_service.update_vacation_request(db, user_id, request_id, updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if request is None:
+        raise HTTPException(status_code=404, detail="Vacation request not found")
+    return request
 
 
 @router.post("/vacation-requests/{request_id}/approve", response_model=VacationRequestOut)

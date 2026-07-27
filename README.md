@@ -6,6 +6,10 @@ vacation, and policy questions.
 ## Roadmap
 See `CLAUDE.md` for the phase-by-phase build plan and current status.
 
+## Status & decisions
+- `docs/status.md` — running log of what's built, in progress, and next.
+- `docs/decisions.md` — key decisions and the reasoning behind them.
+
 ## Local development
 
 1. Copy `.env.example` to `.env` and fill in values (at minimum `SECRET_KEY`

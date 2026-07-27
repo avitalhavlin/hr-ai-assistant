@@ -1,9 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.employee_profile import EmployeeProfileCreate, EmployeeProfileOut
+from app.schemas.employee_profile import (
+    EmployeeProfileCreate,
+    EmployeeProfileOut,
+    EmployeeProfileUpdate,
+)
 from app.services import employee_profile_service
 
 router = APIRouter(prefix="/users/{user_id}/profile", tags=["employee-profiles"])
@@ -30,6 +35,23 @@ def create_employee_profile(user_id: int, payload: EmployeeProfileCreate, db: Se
 @router.get("/", response_model=EmployeeProfileOut)
 def get_employee_profile(user_id: int, db: Session = Depends(get_db)):
     profile = employee_profile_service.get_profile(db, user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Employee profile not found")
+    return profile
+
+
+@router.patch("/", response_model=EmployeeProfileOut)
+def update_employee_profile(
+    user_id: int,
+    payload: EmployeeProfileUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    updates = payload.model_dump(exclude_unset=True)
+    try:
+        profile = employee_profile_service.update_profile(db, user_id, updates)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if profile is None:
         raise HTTPException(status_code=404, detail="Employee profile not found")
     return profile

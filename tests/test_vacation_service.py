@@ -78,6 +78,77 @@ def test_decide_nonexistent_request_raises(db_session):
         vacation_service.approve_vacation_request(db_session, 999)
 
 
+def test_update_vacation_request_updates_dates(db_session):
+    user = _make_user(db_session)
+    request = vacation_service.create_vacation_request(
+        db_session, user.id, date(2026, 8, 1), date(2026, 8, 5)
+    )
+
+    updated = vacation_service.update_vacation_request(
+        db_session, user.id, request.id, {"end_date": date(2026, 8, 10)}
+    )
+
+    assert updated.end_date == date(2026, 8, 10)
+
+
+def test_update_vacation_request_rejects_end_before_start(db_session):
+    user = _make_user(db_session)
+    request = vacation_service.create_vacation_request(
+        db_session, user.id, date(2026, 8, 1), date(2026, 8, 5)
+    )
+
+    with pytest.raises(ValueError):
+        vacation_service.update_vacation_request(
+            db_session, user.id, request.id, {"end_date": date(2026, 7, 1)}
+        )
+
+
+def test_update_already_decided_vacation_request_raises(db_session):
+    user = _make_user(db_session)
+    request = vacation_service.create_vacation_request(
+        db_session, user.id, date(2026, 8, 1), date(2026, 8, 5)
+    )
+    vacation_service.approve_vacation_request(db_session, request.id)
+
+    with pytest.raises(ValueError):
+        vacation_service.update_vacation_request(
+            db_session, user.id, request.id, {"end_date": date(2026, 8, 10)}
+        )
+
+
+def test_update_nonexistent_vacation_request_returns_none(db_session):
+    user = _make_user(db_session)
+    assert (
+        vacation_service.update_vacation_request(
+            db_session, user.id, 999, {"end_date": date(2026, 8, 10)}
+        )
+        is None
+    )
+
+
+def test_update_vacation_request_for_wrong_user_returns_none(db_session):
+    user = _make_user(db_session)
+    other = User(
+        full_name="Other User",
+        email="other-owner@example.com",
+        hashed_password="x",
+        role=Role.employee,
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    request = vacation_service.create_vacation_request(
+        db_session, user.id, date(2026, 8, 1), date(2026, 8, 5)
+    )
+
+    assert (
+        vacation_service.update_vacation_request(
+            db_session, other.id, request.id, {"end_date": date(2026, 8, 10)}
+        )
+        is None
+    )
+
+
 def test_list_vacation_requests_filters_by_user(db_session):
     user = _make_user(db_session)
     other = User(

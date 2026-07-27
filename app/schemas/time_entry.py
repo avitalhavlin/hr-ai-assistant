@@ -9,6 +9,12 @@ class TimeEntryCreate(BaseModel):
     end_time: datetime | None = None
 
 
+class TimeEntryUpdate(BaseModel):
+    work_date: date | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+
+
 class TimeEntryOut(BaseModel):
     id: int
     user_id: int
