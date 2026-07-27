@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr
 
@@ -10,6 +10,9 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: Role = Role.employee
+    hire_date: date
+    expected_daily_hours: float = 8.0
+    remaining_vacation_days: float = 21.0
 
 
 class UserOut(BaseModel):
@@ -20,3 +23,9 @@ class UserOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserWithProfileOut(UserOut):
+    hire_date: date
+    expected_daily_hours: float
+    remaining_vacation_days: float
