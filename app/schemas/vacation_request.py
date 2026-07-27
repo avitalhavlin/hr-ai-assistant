@@ -12,7 +12,7 @@ class VacationRequestCreate(BaseModel):
 
 class VacationRequestOut(BaseModel):
     id: int
-    employee_id: int
+    user_id: int
     start_date: date
     end_date: date
     status: VacationStatus

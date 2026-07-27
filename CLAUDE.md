@@ -8,14 +8,20 @@ chatbot answers questions about hours worked, vacation balance, and company poli
 weekly report on chatbot usage patterns.
 
 ## Current phase
-Phase 1 complete: Employee/TimeEntry/VacationRequest models, hours calculation
-service, and VacationRequest endpoints (create, admin approve/reject) are in
-place. Employee passwords are now hashed with bcrypt (via passlib) on
-creation — pulled forward from Phase 3 at the user's request — but there is
-still no login endpoint or JWT auth, so admin-only actions (vacation
-approve/reject) are gated by a placeholder `X-Admin-Employee-Id` header
-dependency in `app/api/vacation_requests.py`. Replace that with real
-`get_current_employee()`-based auth in Phase 3. No AI wiring yet.
+Phase 1 complete: User/EmployeeProfile/TimeEntry/VacationRequest models, hours
+calculation service, and VacationRequest endpoints (create, admin
+approve/reject) are in place. The former `Employee` model was split into
+`User` (login identity: name, email, hashed password, role) and
+`EmployeeProfile` (HR data: `hire_date`, `expected_daily_hours`,
+`remaining_vacation_days`), one-to-one via `EmployeeProfile.user_id`. All FK
+columns and API routes were renamed to match (`/employees` → `/users`,
+`employee_id` → `user_id` on `TimeEntry`/`VacationRequest`). User passwords
+are hashed with bcrypt (via passlib) on creation — pulled forward from Phase 3
+at the user's request — but there is still no login endpoint or JWT auth, so
+admin-only actions (vacation approve/reject) are gated by a placeholder
+`X-Admin-User-Id` header dependency in `app/api/vacation_requests.py`.
+Replace that with real `get_current_user()`-based auth in Phase 3. No AI
+wiring yet.
 Update this section as phases complete so future sessions know where we left off.
 
 ## Tech stack

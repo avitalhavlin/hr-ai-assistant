@@ -13,13 +13,13 @@ from app.models.vacation_request import VacationRequest, VacationStatus
 
 
 def create_vacation_request(
-    db: Session, employee_id: int, start_date: date, end_date: date
+    db: Session, user_id: int, start_date: date, end_date: date
 ) -> VacationRequest:
     if end_date < start_date:
         raise ValueError("end_date must not be before start_date")
 
     request = VacationRequest(
-        employee_id=employee_id,
+        user_id=user_id,
         start_date=start_date,
         end_date=end_date,
         status=VacationStatus.pending,
@@ -30,10 +30,10 @@ def create_vacation_request(
     return request
 
 
-def list_vacation_requests(db: Session, employee_id: int) -> list[VacationRequest]:
+def list_vacation_requests(db: Session, user_id: int) -> list[VacationRequest]:
     return (
         db.query(VacationRequest)
-        .filter(VacationRequest.employee_id == employee_id)
+        .filter(VacationRequest.user_id == user_id)
         .all()
     )
 
