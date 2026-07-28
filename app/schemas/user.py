@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
@@ -10,7 +11,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: Role = Role.employee
-    hire_date: date
+    hire_date: Optional[date] = None
     expected_daily_hours: float = 8.0
     remaining_vacation_days: float = 21.0
 
@@ -26,6 +27,6 @@ class UserOut(BaseModel):
 
 
 class UserWithProfileOut(UserOut):
-    hire_date: date
+    hire_date: Optional[date]
     expected_daily_hours: float
     remaining_vacation_days: float

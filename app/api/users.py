@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.employee_profile import EmployeeProfile
 from app.models.user import User
-from app.schemas.employee_profile import EmployeeProfileOut
+from app.schemas.employee_profile import EmployeeProfileOut, EmployeeProfileUpdate
 from app.schemas.user import UserCreate, UserOut, UserWithProfileOut
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -33,6 +33,10 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # User and EmployeeProfile share one transaction: flush() (not commit())
+    # assigns user.id without ending the transaction, so if profile creation
+    # fails below, nothing here has been committed and both rows roll back
+    # together on session close.
     user = User(
         full_name=payload.full_name,
         email=payload.email,
@@ -71,6 +75,20 @@ def get_user_profile(user_id: int, db: Session = Depends(get_db)):
     return profile
 
 
+@router.patch("/{user_id}/profile", response_model=EmployeeProfileOut)
+def update_user_profile(user_id: int, payload: EmployeeProfileUpdate, db: Session = Depends(get_db)):
+    profile = db.query(EmployeeProfile).filter(EmployeeProfile.user_id == user_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Employee profile not found")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(profile, field, value)
+
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
 @router.get("/{user_id}/full", response_model=UserWithProfileOut)
 def get_user_full(user_id: int, db: Session = Depends(get_db)):
     user = db.get(User, user_id)
@@ -82,3 +100,14 @@ def get_user_full(user_id: int, db: Session = Depends(get_db)):
 @router.get("/", response_model=list[UserOut])
 def list_users(db: Session = Depends(get_db)):
     return db.query(User).all()
+
+
+@router.delete("/{user_id}", status_code=204)
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # User.profile has cascade="all, delete-orphan", so this removes the
+    # matching employee_profiles row in the same transaction/commit.
+    db.delete(user)
+    db.commit()
