@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.user import Role, User
+from app.repositories import user_repository
 from app.schemas.vacation_request import VacationRequestCreate, VacationRequestOut
 from app.services import vacation_service
 
@@ -18,7 +19,7 @@ def require_admin(
     x_admin_user_id: int = Header(..., alias="X-Admin-User-Id"),
     db: Session = Depends(get_db),
 ) -> User:
-    admin = db.get(User, x_admin_user_id)
+    admin = user_repository.get_by_id(db, x_admin_user_id)
     if admin is None:
         raise HTTPException(status_code=401, detail="Unknown acting user")
     if admin.role != Role.admin:
@@ -33,7 +34,7 @@ def require_admin(
 def create_vacation_request(
     user_id: int, payload: VacationRequestCreate, db: Session = Depends(get_db)
 ):
-    user = db.get(User, user_id)
+    user = user_repository.get_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 

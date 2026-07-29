@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.models.time_entry import TimeEntry
+from app.repositories import time_entry_repository
 
 # NOTE: we deliberately avoid SQL-side extract("week"/"isoyear", ...) here.
 # SQLite (used in tests) doesn't support those extract fields, and relying on
@@ -50,13 +51,5 @@ def get_hours_for_year(db: Session, user_id: int, year: int) -> float:
 
 
 def get_hours_between(db: Session, user_id: int, start: date, end: date) -> float:
-    entries = (
-        db.query(TimeEntry)
-        .filter(
-            TimeEntry.user_id == user_id,
-            TimeEntry.work_date >= start,
-            TimeEntry.work_date <= end,
-        )
-        .all()
-    )
+    entries = time_entry_repository.list_by_user_in_range(db, user_id, start, end)
     return round(sum(_entry_hours(e) for e in entries), 2)

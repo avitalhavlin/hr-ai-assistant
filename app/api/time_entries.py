@@ -2,25 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.time_entry import TimeEntry
 from app.schemas.time_entry import HoursSummary, TimeEntryCreate, TimeEntryOut
-from app.services import hours_service
+from app.services import hours_service, time_entry_service
 
 router = APIRouter(prefix="/users/{user_id}/time-entries", tags=["time-entries"])
 
 
 @router.post("/", response_model=TimeEntryOut)
 def create_time_entry(user_id: int, payload: TimeEntryCreate, db: Session = Depends(get_db)):
-    entry = TimeEntry(user_id=user_id, **payload.model_dump())
-    db.add(entry)
-    db.commit()
-    db.refresh(entry)
-    return entry
+    return time_entry_service.create_time_entry(db, user_id, payload)
 
 
 @router.get("/", response_model=list[TimeEntryOut])
 def list_time_entries(user_id: int, db: Session = Depends(get_db)):
-    return db.query(TimeEntry).filter(TimeEntry.user_id == user_id).all()
+    return time_entry_service.list_time_entries(db, user_id)
 
 
 @router.get("/summary/week", response_model=HoursSummary)
