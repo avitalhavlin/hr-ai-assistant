@@ -23,6 +23,9 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     time_entries = relationship("TimeEntry", back_populates="user", cascade="all, delete-orphan")
+    vacation_requests = relationship(
+        "VacationRequest", back_populates="user", cascade="all, delete-orphan"
+    )
     profile = relationship(
         "EmployeeProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )

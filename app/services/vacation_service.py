@@ -10,6 +10,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.vacation_request import VacationRequest, VacationStatus
+from app.repositories import vacation_request_repository
 
 
 def create_vacation_request(
@@ -18,28 +19,26 @@ def create_vacation_request(
     if end_date < start_date:
         raise ValueError("end_date must not be before start_date")
 
-    request = VacationRequest(
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        status=VacationStatus.pending,
+    request = vacation_request_repository.add(
+        db,
+        VacationRequest(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            status=VacationStatus.pending,
+        ),
     )
-    db.add(request)
     db.commit()
     db.refresh(request)
     return request
 
 
 def list_vacation_requests(db: Session, user_id: int) -> list[VacationRequest]:
-    return (
-        db.query(VacationRequest)
-        .filter(VacationRequest.user_id == user_id)
-        .all()
-    )
+    return vacation_request_repository.list_by_user(db, user_id)
 
 
 def _get_pending_request(db: Session, request_id: int) -> VacationRequest:
-    request = db.get(VacationRequest, request_id)
+    request = vacation_request_repository.get_by_id(db, request_id)
     if request is None:
         raise ValueError("Vacation request not found")
     if request.status != VacationStatus.pending:

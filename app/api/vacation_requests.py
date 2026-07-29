@@ -1,29 +1,14 @@
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.core.database import get_db
-from app.models.user import Role, User
+from app.models.user import User
+from app.repositories import user_repository
 from app.schemas.vacation_request import VacationRequestCreate, VacationRequestOut
 from app.services import vacation_service
 
 router = APIRouter(tags=["vacation-requests"])
-
-# NOTE: real JWT-based auth lands in Phase 3. Until then, admin-only actions
-# are gated by an X-Admin-User-Id header identifying the acting user, which
-# must resolve to a user with the admin role. Replace this dependency with a
-# proper get_current_user()-based check in Phase 3.
-
-
-def require_admin(
-    x_admin_user_id: int = Header(..., alias="X-Admin-User-Id"),
-    db: Session = Depends(get_db),
-) -> User:
-    admin = db.get(User, x_admin_user_id)
-    if admin is None:
-        raise HTTPException(status_code=401, detail="Unknown acting user")
-    if admin.role != Role.admin:
-        raise HTTPException(status_code=403, detail="Admin role required")
-    return admin
 
 
 @router.post(
@@ -33,7 +18,7 @@ def require_admin(
 def create_vacation_request(
     user_id: int, payload: VacationRequestCreate, db: Session = Depends(get_db)
 ):
-    user = db.get(User, user_id)
+    user = user_repository.get_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 

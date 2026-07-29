@@ -22,6 +22,19 @@ admin-only actions (vacation approve/reject) are gated by a placeholder
 `X-Admin-User-Id` header dependency in `app/api/vacation_requests.py`.
 Replace that with real `get_current_user()`-based auth in Phase 3. No AI
 wiring yet.
+
+`User` and `EmployeeProfile` are conceptually one entity split into two tables
+only because profile data isn't needed on every query. They must always be
+created and deleted together: `POST /users` creates both rows in a single DB
+transaction (via `flush()` to get `user.id` before the profile insert, one
+`commit()` at the end — see `app/api/users.py`), and `DELETE /users/{id}`
+relies on `User.profile`'s `cascade="all, delete-orphan"` to remove the
+profile in the same commit. Profile fields with no sensible default
+(`hire_date`) are nullable and can be filled in later via an update
+endpoint (not built yet); `expected_daily_hours`/`remaining_vacation_days`
+keep their policy defaults (8.0 / 21.0) since those are meaningful even
+when not explicitly provided. `user_id` is the only field guaranteed
+non-null on `EmployeeProfile`.
 Update this section as phases complete so future sessions know where we left off.
 
 ## Tech stack
