@@ -1,6 +1,7 @@
 from datetime import date
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.security import verify_password
 from app.models.user import Role
@@ -89,6 +90,14 @@ def test_update_user_profile_raises_when_not_found(db_session):
         user_service.update_user_profile(db_session, 999, EmployeeProfileUpdate())
 
 
+def test_employee_profile_update_rejects_explicit_null():
+    with pytest.raises(ValidationError):
+        EmployeeProfileUpdate(expected_daily_hours=None)
+
+    with pytest.raises(ValidationError):
+        EmployeeProfileUpdate(remaining_vacation_days=None)
+
+
 def test_get_user_full_returns_user_with_profile(db_session):
     created = user_service.create_user(db_session, _make_payload())
 
@@ -127,3 +136,17 @@ def test_delete_user_removes_user_and_profile(db_session):
 def test_delete_user_raises_when_not_found(db_session):
     with pytest.raises(ValueError):
         user_service.delete_user(db_session, 999)
+
+
+def test_delete_user_cascades_vacation_requests(db_session):
+    from app.services import vacation_service
+
+    created = user_service.create_user(db_session, _make_payload())
+    user_id = created.id
+    vacation_service.create_vacation_request(
+        db_session, user_id, date(2026, 8, 1), date(2026, 8, 5)
+    )
+
+    user_service.delete_user(db_session, user_id)
+
+    assert vacation_service.list_vacation_requests(db_session, user_id) == []

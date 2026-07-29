@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 
 def create_user(db: Session, payload: UserCreate) -> User:
-    print("create user", flush=True)
     if user_repository.get_by_email(db, payload.email) is not None:
         raise ValueError("Email already registered")
 
@@ -53,7 +52,6 @@ def create_user(db: Session, payload: UserCreate) -> User:
 
 
 def get_user(db: Session, user_id: int) -> User:
-    print("get user", flush=True)
     user = user_repository.get_by_id(db, user_id)
     if user is None:
         raise ValueError("User not found")
@@ -61,7 +59,6 @@ def get_user(db: Session, user_id: int) -> User:
 
 
 def get_user_profile(db: Session, user_id: int) -> EmployeeProfile:
-    print("get user profile", flush=True)
     profile = employee_profile_repository.get_by_user_id(db, user_id)
     if profile is None:
         raise ValueError("Employee profile not found")
@@ -69,7 +66,6 @@ def get_user_profile(db: Session, user_id: int) -> EmployeeProfile:
 
 
 def update_user_profile(db: Session, user_id: int, payload: EmployeeProfileUpdate) -> EmployeeProfile:
-    print("update user profile", flush=True)
     profile = employee_profile_repository.get_by_user_id(db, user_id)
     if profile is None:
         raise ValueError("Employee profile not found")
@@ -81,7 +77,6 @@ def update_user_profile(db: Session, user_id: int, payload: EmployeeProfileUpdat
 
 
 def get_user_full(db: Session, user_id: int) -> User:
-    print("get user full" , flush=True)
     user = user_repository.get_by_id(db, user_id)
     if user is None or user.profile is None:
         raise ValueError("User not found")
@@ -89,12 +84,10 @@ def get_user_full(db: Session, user_id: int) -> User:
 
 
 def list_users(db: Session) -> list[User]:
-    print("list users", flush=True)
     return user_repository.list_all(db)
 
 
 def delete_user(db: Session, user_id: int) -> None:
-    print("delete user", flush=True)
     user = user_repository.get_by_id(db, user_id)
     if user is None:
         raise ValueError("User not found")

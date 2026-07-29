@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_admin
 from app.core.database import get_db
 from app.models.employee_profile import EmployeeProfile
 from app.models.user import User
@@ -79,8 +80,11 @@ def list_users(db: Session = Depends(get_db)):
 
 
 @router.delete("/{user_id}", status_code=204)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
     try:
         user_service.delete_user(db, user_id)
     except ValueError as exc:
