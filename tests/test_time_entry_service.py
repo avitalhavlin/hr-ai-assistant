@@ -1,5 +1,7 @@
 from datetime import date, datetime
 
+import pytest
+
 from app.models.user import Role, User
 from app.schemas.time_entry import TimeEntryCreate
 from app.services import time_entry_service
@@ -34,6 +36,21 @@ def test_create_time_entry_persists_entry(db_session):
     assert entry.id is not None
     assert entry.user_id == user.id
     assert entry.work_date == date(2026, 7, 13)
+
+
+def test_create_time_entry_rejects_end_before_start(db_session):
+    user = _make_user(db_session)
+
+    with pytest.raises(ValueError):
+        time_entry_service.create_time_entry(
+            db_session,
+            user.id,
+            TimeEntryCreate(
+                work_date=date(2026, 7, 13),
+                start_time=datetime(2026, 7, 13, 17, 0),
+                end_time=datetime(2026, 7, 13, 9, 0),
+            ),
+        )
 
 
 def test_create_time_entry_allows_open_entry_without_end_time(db_session):
