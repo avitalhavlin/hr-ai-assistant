@@ -30,7 +30,10 @@ def _entry_hours(entry: TimeEntry) -> float:
 
 def _iso_week_range(year: int, week: int) -> tuple[date, date]:
     """Return (monday, sunday) for a given ISO year/week."""
-    monday = date.fromisocalendar(year, week, 1)
+    try:
+        monday = date.fromisocalendar(year, week, 1)
+    except ValueError as exc:
+        raise ValueError(f"Invalid ISO week: {year}-W{week:02d}") from exc
     sunday = monday + timedelta(days=6)
     return monday, sunday
 
@@ -41,6 +44,8 @@ def get_hours_for_week(db: Session, user_id: int, year: int, week: int) -> float
 
 
 def get_hours_for_month(db: Session, user_id: int, year: int, month: int) -> float:
+    if not 1 <= month <= 12:
+        raise ValueError("month must be 1-12")
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) - timedelta(days=1) if month == 12 else date(year, month + 1, 1) - timedelta(days=1)
     return get_hours_between(db, user_id, start, end)
