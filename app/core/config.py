@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # App
+    # NOTE: override secret_key via .env in any non-dev environment — JWTs
+    # are only as safe as this value.
     secret_key: str = "change-me"
+    algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     environment: str = "development"
 
