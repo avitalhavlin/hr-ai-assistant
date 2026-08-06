@@ -1,0 +1,57 @@
+{
+  "manifest_version": "0.4",
+  "name": "hr-ai-assistant",
+  "display_name": "HR AI Assistant (test)",
+  "version": "1.1.0",
+  "description": "Test connector exposing list_users and create_user from the local HR AI Assistant API",
+  "author": {
+    "name": "Avital Havlin"
+  },
+  "server": {
+    "type": "uv",
+    "entry_point": "src/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "src/server.py"],
+      "env": {
+        "HR_API_BASE_URL": "${user_config.api_base_url}",
+        "ADMIN_EMAIL": "${user_config.admin_email}",
+        "ADMIN_PASSWORD": "${user_config.admin_password}"
+      }
+    }
+  },
+  "user_config": {
+    "api_base_url": {
+      "type": "string",
+      "title": "HR API Base URL",
+      "description": "Base URL of the running FastAPI app (uvicorn app.main:app --reload)",
+      "default": "http://localhost:8000",
+      "required": false
+    },
+    "admin_email": {
+      "type": "string",
+      "title": "Admin Email",
+      "description": "Email of the admin user created via scripts/create_admin.py",
+      "required": true
+    },
+    "admin_password": {
+      "type": "string",
+      "title": "Admin Password",
+      "description": "Password of that admin user",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "tools": [
+    { "name": "list_users", "description": "List all users in the HR system (admin only)" },
+    { "name": "create_user", "description": "Create a new user in the HR system (admin only)" }
+  ],
+  "compatibility": {
+    "platforms": ["win32"],
+    "runtimes": {
+      "python": ">=3.10"
+    }
+  },
+  "keywords": ["hr", "test"],
+  "license": "MIT"
+}
