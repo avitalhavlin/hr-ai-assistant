@@ -30,6 +30,24 @@ See `CLAUDE.md` for the phase-by-phase build plan and current status.
    ```
 6. Open http://localhost:8000/docs for the interactive Swagger UI.
 
+### First admin user (local dev)
+
+`POST /users/` always forces `role=employee` when called without an admin
+token — this is intentional (see CLAUDE.md), so nobody can self-register as
+admin over the API. That means a fresh database has no admin at all until
+you bootstrap one directly, bypassing the API:
+
+```bash
+python scripts/create_admin.py
+```
+
+It prompts for an email/password/name and creates the user straight through
+the service layer with `role=admin`. Log in with those credentials at
+`POST /auth/token` (or via the **Authorize** button in Swagger UI, using the
+OAuth2 password flow) to get a bearer token for admin-only routes like
+`GET /users/`. Only needs to be run once per database — that admin can then
+create further admins through the normal API.
+
 ## Running with Docker (full stack)
 
 ```bash

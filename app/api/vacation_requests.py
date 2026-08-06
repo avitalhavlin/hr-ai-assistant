@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, require_owner_or_admin
 from app.core.database import get_db
 from app.models.user import User
 from app.repositories import user_repository
@@ -16,7 +16,10 @@ router = APIRouter(tags=["vacation-requests"])
     response_model=VacationRequestOut,
 )
 def create_vacation_request(
-    user_id: int, payload: VacationRequestCreate, db: Session = Depends(get_db)
+    user_id: int,
+    payload: VacationRequestCreate,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_owner_or_admin),
 ):
     user = user_repository.get_by_id(db, user_id)
     if user is None:
@@ -34,7 +37,11 @@ def create_vacation_request(
     "/users/{user_id}/vacation-requests/",
     response_model=list[VacationRequestOut],
 )
-def list_vacation_requests(user_id: int, db: Session = Depends(get_db)):
+def list_vacation_requests(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_owner_or_admin),
+):
     return vacation_service.list_vacation_requests(db, user_id)
 
 

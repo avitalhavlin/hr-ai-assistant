@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.deps import require_owner_or_admin
 from app.core.database import get_db
+from app.models.user import User
 from app.schemas.time_entry import HoursSummary, TimeEntryCreate, TimeEntryOut
 from app.services import hours_service, time_entry_service
 
@@ -17,7 +19,11 @@ def create_time_entry(user_id: int, payload: TimeEntryCreate, db: Session = Depe
 
 
 @router.get("/", response_model=list[TimeEntryOut])
-def list_time_entries(user_id: int, db: Session = Depends(get_db)):
+def list_time_entries(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_owner_or_admin),
+):
     return time_entry_service.list_time_entries(db, user_id)
 
 
@@ -40,6 +46,11 @@ def monthly_summary(user_id: int, year: int, month: int, db: Session = Depends(g
 
 
 @router.get("/summary/year", response_model=HoursSummary)
-def yearly_summary(user_id: int, year: int, db: Session = Depends(get_db)):
+def yearly_summary(
+    user_id: int,
+    year: int,
+    db: Session = Depends(get_db),
+    _current: User = Depends(require_owner_or_admin),
+):
     total = hours_service.get_hours_for_year(db, user_id, year)
     return HoursSummary(period="year", period_label=str(year), total_hours=total)

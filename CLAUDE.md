@@ -8,20 +8,34 @@ chatbot answers questions about hours worked, vacation balance, and company poli
 weekly report on chatbot usage patterns.
 
 ## Current phase
-Phase 1 complete: User/EmployeeProfile/TimeEntry/VacationRequest models, hours
-calculation service, and VacationRequest endpoints (create, admin
-approve/reject) are in place. The former `Employee` model was split into
-`User` (login identity: name, email, hashed password, role) and
-`EmployeeProfile` (HR data: `hire_date`, `expected_daily_hours`,
-`remaining_vacation_days`), one-to-one via `EmployeeProfile.user_id`. All FK
-columns and API routes were renamed to match (`/employees` → `/users`,
-`employee_id` → `user_id` on `TimeEntry`/`VacationRequest`). User passwords
-are hashed with bcrypt (via passlib) on creation — pulled forward from Phase 3
-at the user's request — but there is still no login endpoint or JWT auth, so
-admin-only actions (vacation approve/reject) are gated by a placeholder
-`X-Admin-User-Id` header dependency in `app/api/vacation_requests.py`.
-Replace that with real `get_current_user()`-based auth in Phase 3. No AI
-wiring yet.
+Phase 3 complete: real JWT-based auth. `POST /auth/token` (OAuth2
+password-form login — `username` field carries the email) issues a bearer
+access token via `app/core/security.py::create_access_token` (HS256, signed
+with `settings.secret_key`/`settings.algorithm`, expiry from
+`settings.access_token_expire_minutes`); `app/services/auth_service.py`
+checks credentials with the existing `verify_password`. `app/api/deps.py`'s
+`get_current_user` decodes the token and loads the `User` fresh from the DB
+on every request, so a role change or deletion takes effect immediately —
+no refresh tokens or revocation list. `require_admin` (same name as before,
+now backed by real auth) and the new `require_owner_or_admin` (reads
+`user_id` from each route's own path parameter) gate every endpoint; the
+placeholder `X-Admin-User-Id` header is gone. Unauthenticated `POST /users/`
+always creates `role=employee` regardless of payload — only an authenticated
+admin caller may set another role. `PATCH /users/{id}/profile` is
+owner-or-admin, but only an admin may include `expected_daily_hours`/
+`remaining_vacation_days` in the payload (checked in the route via
+`payload.model_fields_set`, not in `user_service`, since it's authorization
+policy, not a domain invariant); an owner may still update their own
+`hire_date`. `GET /users/` and `DELETE /users/{id}` are admin-only; all other
+`/users/{id}...`, time-entry, and vacation-request "own resource" routes are
+owner-or-admin. No AI wiring yet.
+
+The former `Employee` model was split into `User` (login identity: name,
+email, hashed password, role) and `EmployeeProfile` (HR data: `hire_date`,
+`expected_daily_hours`, `remaining_vacation_days`), one-to-one via
+`EmployeeProfile.user_id`. All FK columns and API routes were renamed to
+match (`/employees` → `/users`, `employee_id` → `user_id` on
+`TimeEntry`/`VacationRequest`).
 
 `User` and `EmployeeProfile` are conceptually one entity split into two tables
 only because profile data isn't needed on every query. They must always be
