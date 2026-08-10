@@ -25,7 +25,7 @@ TOOLS = [
                 name="get_my_hours",
                 description=(
                     "Get the total hours the authenticated employee worked in a "
-                    "given period. If year/week/month are omitted, defaults to "
+                    "given month or year. If year/month are omitted, defaults to "
                     "the current period."
                 ),
                 parameters_json_schema={
@@ -33,19 +33,12 @@ TOOLS = [
                     "properties": {
                         "period": {
                             "type": "string",
-                            "enum": ["week", "month", "year"],
+                            "enum": ["month", "year"],
                             "description": "Which period to total hours for.",
                         },
                         "year": {
                             "type": "integer",
                             "description": "Calendar year. Defaults to the current year.",
-                        },
-                        "week": {
-                            "type": "integer",
-                            "description": (
-                                "ISO week number (1-53), only used when period is "
-                                "'week'. Defaults to the current ISO week."
-                            ),
                         },
                         "month": {
                             "type": "integer",
@@ -56,6 +49,29 @@ TOOLS = [
                         },
                     },
                     "required": ["period"],
+                },
+            ),
+            types.FunctionDeclaration(
+                name="get_hours_between",
+                description=(
+                    "Get the total hours the authenticated employee worked between "
+                    "two dates (inclusive), for any arbitrary date range."
+                ),
+                parameters_json_schema={
+                    "type": "object",
+                    "properties": {
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Start of the range, as YYYY-MM-DD.",
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "End of the range (inclusive), as YYYY-MM-DD.",
+                        },
+                    },
+                    "required": ["start_date", "end_date"],
                 },
             ),
             types.FunctionDeclaration(
@@ -78,17 +94,12 @@ def get_my_hours(
     user_id: int,
     period: str,
     year: int | None = None,
-    week: int | None = None,
     month: int | None = None,
 ) -> dict:
     today = date.today()
     year = year or today.year
 
-    if period == "week":
-        week = week or today.isocalendar().week
-        hours = hours_service.get_hours_for_week(db, user_id, year, week)
-        label = f"{year}-W{week:02d}"
-    elif period == "month":
+    if period == "month":
         month = month or today.month
         hours = hours_service.get_hours_for_month(db, user_id, year, month)
         label = f"{year}-{month:02d}"
@@ -96,9 +107,19 @@ def get_my_hours(
         hours = hours_service.get_hours_for_year(db, user_id, year)
         label = str(year)
     else:
-        raise ValueError(f"Unknown period: {period!r} (expected week, month, or year)")
+        raise ValueError(f"Unknown period: {period!r} (expected month or year)")
 
     return {"period": label, "total_hours": hours}
+
+
+def get_hours_between(db: Session, user_id: int, start_date: str, end_date: str) -> dict:
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+    if end < start:
+        raise ValueError("end_date must not be before start_date")
+
+    hours = hours_service.get_hours_between(db, user_id, start, end)
+    return {"start_date": start_date, "end_date": end_date, "total_hours": hours}
 
 
 def get_vacation_balance(db: Session, user_id: int) -> dict:
@@ -120,6 +141,8 @@ def call_tool(name: str, args: dict, db: Session, user_id: int) -> dict:
     try:
         if name == "get_my_hours":
             return get_my_hours(db, user_id, **args)
+        if name == "get_hours_between":
+            return get_hours_between(db, user_id, **args)
         if name == "get_vacation_balance":
             return get_vacation_balance(db, user_id)
         if name == "get_office_hours":

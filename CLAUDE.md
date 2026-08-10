@@ -21,15 +21,21 @@ plus a `role="user"` turn containing each call's
 `types.Part.from_function_response(...)` (that role for function-response
 turns is confirmed against the installed SDK's own automatic-function-
 calling code, not guessed) and loops; once a response has no function
-calls, `response.text` is returned. `app/ai/tools.py` declares the three
+calls, `response.text` is returned. `app/ai/tools.py` declares the four
 tools' schemas (`types.Tool(function_declarations=[...])`, using
 `parameters_json_schema` — a plain JSON-schema dict — for each) and holds
 `call_tool(name, args, db, user_id)`, which dispatches to
-`get_my_hours`/`get_vacation_balance`/`get_office_hours`. Each is a thin
-wrapper: `get_my_hours` resolves "current period" defaults from
-`date.today()` when the model omits year/week/month, then calls
-`hours_service.get_hours_for_week/month/year`; `get_vacation_balance`
-calls the new `vacation_service.get_vacation_balance` (wraps
+`get_my_hours`/`get_hours_between`/`get_vacation_balance`/
+`get_office_hours`. Each is a thin wrapper: `get_my_hours` (period
+`month`/`year` only — `week` was dropped in favor of the more flexible
+`get_hours_between`) resolves "current period" defaults from
+`date.today()` when the model omits year/month, then calls
+`hours_service.get_hours_for_month/year`; `get_hours_between` takes
+arbitrary `start_date`/`end_date` (`YYYY-MM-DD` strings, parsed with
+`date.fromisoformat`) and calls `hours_service.get_hours_between`
+directly, for any date range the week/month/year shortcuts don't cover;
+`get_vacation_balance` calls the new `vacation_service.get_vacation_balance`
+(wraps
 `employee_profile_repository.get_by_user_id`, returns `None` if the user
 has no profile yet); `get_office_hours` just reads
 `settings.office_open_time`/`office_close_time`/`working_days`. Tool

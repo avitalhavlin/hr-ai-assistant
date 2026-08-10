@@ -32,9 +32,45 @@ def test_get_my_hours_with_explicit_period(db_session):
     )
     db_session.commit()
 
-    result = tools.get_my_hours(db_session, user.id, period="week", year=2026, week=29)
+    result = tools.get_my_hours(db_session, user.id, period="month", year=2026, month=7)
 
-    assert result == {"period": "2026-W29", "total_hours": 8.0}
+    assert result == {"period": "2026-07", "total_hours": 8.0}
+
+
+def test_get_hours_between_sums_entries_in_range(db_session):
+    user = _make_user(db_session)
+    db_session.add_all(
+        [
+            TimeEntry(
+                user_id=user.id,
+                work_date=date(2026, 7, 13),
+                start_time=datetime(2026, 7, 13, 9, 0),
+                end_time=datetime(2026, 7, 13, 17, 0),
+            ),
+            # Outside the range — must not be counted.
+            TimeEntry(
+                user_id=user.id,
+                work_date=date(2026, 8, 1),
+                start_time=datetime(2026, 8, 1, 9, 0),
+                end_time=datetime(2026, 8, 1, 17, 0),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    result = tools.get_hours_between(db_session, user.id, "2026-07-01", "2026-07-31")
+
+    assert result == {"start_date": "2026-07-01", "end_date": "2026-07-31", "total_hours": 8.0}
+
+
+def test_get_hours_between_rejects_end_before_start(db_session):
+    user = _make_user(db_session)
+
+    try:
+        tools.get_hours_between(db_session, user.id, "2026-07-31", "2026-07-01")
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
 
 
 def test_get_my_hours_defaults_to_current_period(db_session, monkeypatch):
@@ -106,6 +142,19 @@ def test_call_tool_dispatches_get_my_hours(db_session):
     )
 
     assert result == {"period": "2026", "total_hours": 0.0}
+
+
+def test_call_tool_dispatches_get_hours_between(db_session):
+    user = _make_user(db_session)
+
+    result = tools.call_tool(
+        "get_hours_between",
+        {"start_date": "2026-07-01", "end_date": "2026-07-31"},
+        db_session,
+        user.id,
+    )
+
+    assert result == {"start_date": "2026-07-01", "end_date": "2026-07-31", "total_hours": 0.0}
 
 
 def test_call_tool_converts_value_error_to_error_dict(db_session):
