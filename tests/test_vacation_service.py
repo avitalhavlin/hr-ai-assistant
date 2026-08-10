@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 
+from app.models.employee_profile import EmployeeProfile
 from app.models.user import Role, User
 from app.models.vacation_request import VacationStatus
 from app.services import vacation_service
@@ -76,6 +77,20 @@ def test_cannot_decide_already_decided_request(db_session):
 def test_decide_nonexistent_request_raises(db_session):
     with pytest.raises(ValueError):
         vacation_service.approve_vacation_request(db_session, 999)
+
+
+def test_get_vacation_balance_with_profile(db_session):
+    user = _make_user(db_session)
+    db_session.add(EmployeeProfile(user_id=user.id, remaining_vacation_days=15.0))
+    db_session.commit()
+
+    assert vacation_service.get_vacation_balance(db_session, user.id) == 15.0
+
+
+def test_get_vacation_balance_without_profile(db_session):
+    user = _make_user(db_session)
+
+    assert vacation_service.get_vacation_balance(db_session, user.id) is None
 
 
 def test_list_vacation_requests_filters_by_user(db_session):
