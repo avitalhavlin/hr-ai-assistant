@@ -1,6 +1,6 @@
 # HR AI Assistant
 
-Employee time-tracking system with a Claude-powered chatbot for hours,
+Employee time-tracking system with a Gemini-powered chatbot for hours,
 vacation, and policy questions.
 
 ## Roadmap
@@ -9,7 +9,7 @@ See `CLAUDE.md` for the phase-by-phase build plan and current status.
 ## Local development
 
 1. Copy `.env.example` to `.env` and fill in values (at minimum `SECRET_KEY`
-   and, once you reach Phase 4, `ANTHROPIC_API_KEY`).
+   and, once you reach Phase 4, `GEMINI_API_KEY`).
 2. Start Postgres:
    ```bash
    docker compose up -d db
@@ -69,7 +69,7 @@ app/
 ├── models/     # SQLAlchemy ORM models
 ├── schemas/    # Pydantic request/response schemas
 ├── services/   # business logic (hours calc, vacation calc, etc.)
-├── ai/         # Claude client, tool definitions, prompts, RAG (Phase 4+)
+├── ai/         # Gemini client, tool definitions, prompts, RAG (Phase 4+)
 └── main.py     # app entrypoint
 tests/          # pytest suite
 ```

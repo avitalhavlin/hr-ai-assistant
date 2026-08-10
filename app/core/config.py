@@ -20,8 +20,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./dev.db"
 
-    # Anthropic (Phase 4+)
-    anthropic_api_key: str = ""
+    # Gemini (Phase 4+)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
 
     # Company policy placeholders — confirm real values with the business
     # before relying on these in the chatbot (Phase 5/6).
