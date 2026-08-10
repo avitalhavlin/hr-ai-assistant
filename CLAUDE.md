@@ -2,12 +2,30 @@
 
 ## What this project is
 An HR time-tracking system with an AI chatbot layer. Employees log daily
-start/end times; the system computes weekly/monthly/yearly hours; a Claude-powered
+start/end times; the system computes weekly/monthly/yearly hours; a Gemini-powered
 chatbot answers questions about hours worked, vacation balance, and company policy
 (office hours, working days), and also works as a general assistant. Admins get a
 weekly report on chatbot usage patterns.
 
 ## Current phase
+Phase 4 complete: basic Gemini chat endpoint, no tools yet. `POST /chat/`
+(any authenticated user, via `app/api/deps.py::get_current_user`) accepts a
+`message` plus an optional `history` list of prior `{role, content}` turns
+and returns `{"reply": ...}`. `app/services/chat_service.py::
+send_chat_message` builds the `generate_content` request (fixed system
+prompt from `app/ai/prompts.py` as `system_instruction`, `model=
+settings.gemini_model`, `max_output_tokens=1024`, history roles mapped
+`assistant`→`model` since that's Gemini's convention) and calls it through
+`app/ai/client.py::get_client()`, a lazily-constructed singleton
+`genai.Client` — that indirection exists so tests can monkeypatch
+`get_client`/`send_chat_message` instead of hitting the real API.
+Conversation history is entirely client-resent; nothing is persisted
+server-side (chat logging is Phase 7) and there's no tool use yet (Phase 5)
+or RAG (Phase 6), so the system prompt tells the model to say plainly it
+can't look up real hours/vacation/policy data rather than guessing. Any
+`google.genai.errors.APIError` from the SDK is caught in the service,
+re-raised as `ChatServiceError`, and mapped to a 502 in the route.
+
 Phase 3 complete: real JWT-based auth. `POST /auth/token` (OAuth2
 password-form login — `username` field carries the email) issues a bearer
 access token via `app/core/security.py::create_access_token` (HS256, signed
@@ -28,7 +46,7 @@ owner-or-admin, but only an admin may include `expected_daily_hours`/
 policy, not a domain invariant); an owner may still update their own
 `hire_date`. `GET /users/` and `DELETE /users/{id}` are admin-only; all other
 `/users/{id}...`, time-entry, and vacation-request "own resource" routes are
-owner-or-admin. No AI wiring yet.
+owner-or-admin.
 
 The former `Employee` model was split into `User` (login identity: name,
 email, hashed password, role) and `EmployeeProfile` (HR data: `hire_date`,
@@ -55,7 +73,7 @@ Update this section as phases complete so future sessions know where we left off
 - Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2 / pydantic-settings
 - PostgreSQL (docker-compose for local dev)
 - JWT auth (python-jose + passlib)
-- Anthropic Python SDK for the chatbot (added in Phase 4+)
+- Google Gemini API (`google-genai` SDK) for the chatbot (basic chat endpoint since Phase 4)
 - pytest for tests
 
 ## Conventions
