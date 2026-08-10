@@ -10,7 +10,13 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.models.vacation_request import VacationRequest, VacationStatus
-from app.repositories import vacation_request_repository
+from app.repositories import employee_profile_repository, vacation_request_repository
+
+
+def get_vacation_balance(db: Session, user_id: int) -> float | None:
+    """Remaining vacation days for a user, or None if they have no profile yet."""
+    profile = employee_profile_repository.get_by_user_id(db, user_id)
+    return profile.remaining_vacation_days if profile else None
 
 
 def create_vacation_request(
