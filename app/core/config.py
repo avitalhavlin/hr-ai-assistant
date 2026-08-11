@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
 
+    # Gemini embeddings, for RAG over policy docs (Phase 6)
+    gemini_embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 768
+
     # Company policy placeholders — confirm real values with the business
     # before relying on these in the chatbot (Phase 5/6).
     office_open_time: str = "09:00"

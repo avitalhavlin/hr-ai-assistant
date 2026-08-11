@@ -8,6 +8,52 @@ chatbot answers questions about hours worked, vacation balance, and company poli
 weekly report on chatbot usage patterns.
 
 ## Current phase
+Phase 6 complete: RAG over company policy docs. Policy markdown files live
+in `app/ai/policy_docs/` (currently 3 placeholder docs — vacation/leave,
+remote work, code of conduct — written as sample content; swap in the real
+policies before relying on this for real answers). A new `PolicyChunk`
+model/table (`app/models/policy_chunk.py`, migration
+`500cd5e17304_add_policy_chunks_table_with_pgvector_`) stores embedded
+chunks; embeddings use a pgvector `Vector(settings.embedding_dimensions)`
+column on Postgres (the `db` service in `docker-compose.yml` now runs
+`pgvector/pgvector:pg16` instead of plain `postgres:16-alpine`, so
+`CREATE EXTENSION vector` — run by that migration — succeeds).
+`app/services/policy_service.py::chunk_text` splits a doc into
+paragraph-sized chunks (merging any paragraph under ~200 chars, e.g. a
+markdown header, into its neighbor); `reindex_policies(db)` wipes and
+rebuilds the whole table from `app/ai/policy_docs/*.md`, embedding each
+chunk via `app/ai/embeddings.py::embed_text(text, task_type=
+"RETRIEVAL_DOCUMENT")` — run manually with `python
+scripts/reindex_policies.py` whenever the docs change (no admin API
+endpoint for this; it's a rare maintenance action, not a user flow).
+`search_policies(db, query, top_k=3)` embeds the query with
+`task_type="RETRIEVAL_QUERY"` and calls
+`policy_chunk_repository.search_similar`, which ranks by
+`PolicyChunk.embedding.cosine_distance(...)` (pgvector's `<=>` operator —
+Postgres-only, so `tests/test_policy_chunk_repository.py` only covers
+plain CRUD against the SQLite fixture, not this query; it's verified
+manually against the real dockerized Postgres instead). The new
+`search_policy_docs` tool in `app/ai/tools.py` wraps `search_policies` and
+is offered to every caller, same tier as the other employee tools;
+`SYSTEM_PROMPT` now tells the model to ground policy answers strictly in
+what the tool returns and say plainly when nothing relevant comes back,
+rather than the old blanket "I can't look that up yet" disclaimer.
+Embeddings use the free Gemini `embed_content` API
+(`gemini-embedding-001`, same SDK/key as chat) rather than a new provider
+or a dedicated vector DB, per the "don't add new third-party services
+without checking in" rule below.
+
+Note: `app/main.py` still runs `Base.metadata.create_all(bind=engine)` at
+import time (a Phase 0/1 leftover the comment above it says should have
+been replaced by `alembic upgrade head` once Alembic was set up in Phase
+1 — that follow-up was never done). Any dev DB bootstrapped that way has
+no Alembic version history, so a fresh `alembic upgrade head` will try to
+replay old migrations against tables that don't match (e.g. the
+users/employees rename) and fail; `alembic stamp <current head>` before
+upgrading resolves it for an existing dev DB. Worth fixing properly
+(swap that call for a real `alembic upgrade head` and drop the
+`create_all`) next time this area is touched.
+
 Phase 5 complete: chatbot tool use. `POST /chat/` (any authenticated user,
 via `app/api/deps.py::get_current_user`, plus a `db: Session =
 Depends(get_db)`) accepts a `message` plus an optional `history` list of
@@ -57,10 +103,9 @@ access. A `ValueError` from a tool (e.g. an invalid month) is caught in
 `call_tool` and turned into `{"error": ...}` returned to the model,
 rather than raised, so a bad tool call doesn't fail the whole chat
 request. `app/ai/prompts.py`'s `SYSTEM_PROMPT` now tells the model to use
-these tools rather than guess real numbers, mentions the admin-only
-report tool, while still disclaiming policy documents beyond office
-hours (RAG is Phase 6) and chat logging
-(Phase 7). Any `google.genai.errors.APIError` from the SDK is still
+these tools rather than guess real numbers and mentions the admin-only
+report tool (policy documents beyond office hours followed in Phase 6;
+chat logging is still Phase 7). Any `google.genai.errors.APIError` from the SDK is still
 caught in the service, re-raised as `ChatServiceError`, and mapped to a
 502 in the route — same as Phase 4.
 
@@ -147,5 +192,11 @@ Update this section as phases complete so future sessions know where we left off
 
 ## Things to ask the human about before assuming
 - Company-specific policy numbers (vacation accrual rate, office hours, holidays)
-  are placeholders in `app/core/config.py` — confirm real values before Phase 5/6.
-- Don't add new third-party services (vector DB, hosting) without checking in.
+  are placeholders in `app/core/config.py` — confirm real values.
+- The Phase 6 policy docs in `app/ai/policy_docs/` are placeholder/sample
+  content too (leave policy, remote work, code of conduct) — swap in the
+  real documents before relying on chatbot answers grounded in them, then
+  re-run `python scripts/reindex_policies.py`.
+- Don't add new third-party services (vector DB, hosting) without checking
+  in. (Phase 6's RAG intentionally avoided this — it reuses the existing
+  Postgres via the pgvector extension rather than a new vector DB service.)

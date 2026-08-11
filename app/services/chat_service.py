@@ -5,9 +5,7 @@ the tools in app/ai/tools.py for real employee data, and returns the final
 reply as plain text.
 
 No conversation persistence yet — chat logging lands in Phase 7, so the
-caller is responsible for resending history on each request. No RAG yet
-either (Phase 6), so anything beyond the tools in app/ai/tools.py is
-still out of the model's reach.
+caller is responsible for resending history on each request.
 """
 
 from google.genai import errors, types

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(findstr \":8000\")",
+      "Bash(tasklist)",
+      "Bash(findstr /i \"python uvicorn\")",
+      "Bash(\"C:/Users/netan/Projects/hr-ai-assistant/.venv/Scripts/python.exe\" -m pip install pgvector==0.5.0)",
+      "Bash(\"C:/Users/netan/Projects/hr-ai-assistant/.venv/Scripts/python.exe\" -c \"import app.main; print\\('app imported OK'\\)\")",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/auth/token -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=avitalhavlin@gmail.com&password=WRONG_PLACEHOLDER' -w '\\\\nSTATUS:%{http_code}\\\\n')"
+    ]
+  }
+}

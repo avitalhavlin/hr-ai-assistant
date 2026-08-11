@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgres:16-alpine
+    # pgvector-enabled Postgres 16 image (drop-in for postgres:16-alpine) —
+    # needed so `CREATE EXTENSION vector` works for the RAG policy_chunks table.
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: hr_user

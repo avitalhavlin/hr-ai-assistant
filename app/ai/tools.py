@@ -21,7 +21,7 @@ from google.genai import types
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.services import hours_service, user_service, vacation_service
+from app.services import hours_service, policy_service, user_service, vacation_service
 
 _EMPLOYEE_DECLARATIONS = [
     types.FunctionDeclaration(
@@ -86,6 +86,25 @@ _EMPLOYEE_DECLARATIONS = [
         name="get_office_hours",
         description="Get the company's office hours and working days policy.",
         parameters_json_schema={"type": "object", "properties": {}},
+    ),
+    types.FunctionDeclaration(
+        name="search_policy_docs",
+        description=(
+            "Search company policy documents (vacation/leave, remote work, "
+            "code of conduct, etc.) for content relevant to a question. "
+            "Returns the most relevant excerpts, not a direct answer — base "
+            "the answer only on what's returned."
+        ),
+        parameters_json_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The policy question to search for.",
+                },
+            },
+            "required": ["query"],
+        },
     ),
 ]
 
@@ -171,6 +190,11 @@ def get_office_hours() -> dict:
     }
 
 
+def search_policy_docs(db: Session, query: str) -> dict:
+    matches = policy_service.search_policies(db, query)
+    return {"matches": matches}
+
+
 def get_employees_hours_report(
     db: Session, start_date: str | None = None, end_date: str | None = None
 ) -> dict:
@@ -206,6 +230,8 @@ def call_tool(name: str, args: dict, db: Session, user_id: int, is_admin: bool) 
             return get_vacation_balance(db, user_id)
         if name == "get_office_hours":
             return get_office_hours()
+        if name == "search_policy_docs":
+            return search_policy_docs(db, **args)
         if name == "get_employees_hours_report":
             if not is_admin:
                 return {"error": "Admin access required for this tool."}

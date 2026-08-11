@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.models.employee_profile import EmployeeProfile
 from app.models.time_entry import TimeEntry
 from app.models.user import Role, User
+from app.services import policy_service
 
 
 def _make_user(db, **overrides):
@@ -128,6 +129,15 @@ def test_get_office_hours_reads_settings():
     }
 
 
+def test_search_policy_docs_returns_matches(db_session, monkeypatch):
+    fake_matches = [{"source": "vacation_and_leave", "content": "21 days a year"}]
+    monkeypatch.setattr(policy_service, "search_policies", lambda db, query: fake_matches)
+
+    result = tools.search_policy_docs(db_session, "how many vacation days do I get")
+
+    assert result == {"matches": fake_matches}
+
+
 def test_get_employees_hours_report_sums_each_employee(db_session):
     alice = _make_user(db_session, full_name="Alice", email="alice@example.com")
     bob = _make_user(db_session, full_name="Bob", email="bob@example.com")
@@ -213,6 +223,17 @@ def test_call_tool_dispatches_get_hours_between(db_session):
     assert result == {"start_date": "2026-07-01", "end_date": "2026-07-31", "total_hours": 0.0}
 
 
+def test_call_tool_dispatches_search_policy_docs(db_session, monkeypatch):
+    user = _make_user(db_session)
+    monkeypatch.setattr(policy_service, "search_policies", lambda db, query: [])
+
+    result = tools.call_tool(
+        "search_policy_docs", {"query": "remote work"}, db_session, user.id, is_admin=False
+    )
+
+    assert result == {"matches": []}
+
+
 def test_call_tool_rejects_employees_report_for_non_admin(db_session):
     user = _make_user(db_session)
 
@@ -264,7 +285,13 @@ def test_build_tools_omits_admin_report_for_non_admin():
     declared = _declared_names(tools.build_tools(is_admin=False))
 
     assert "get_employees_hours_report" not in declared
-    assert {"get_my_hours", "get_hours_between", "get_vacation_balance", "get_office_hours"} <= declared
+    assert {
+        "get_my_hours",
+        "get_hours_between",
+        "get_vacation_balance",
+        "get_office_hours",
+        "search_policy_docs",
+    } <= declared
 
 
 def test_build_tools_includes_admin_report_for_admin():
