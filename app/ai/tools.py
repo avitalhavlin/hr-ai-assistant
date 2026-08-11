@@ -5,6 +5,11 @@ bound by chat_service.py from the authenticated request, never exposed as
 model-settable parameters, so the model can never act on another user's
 data.
 
+Admin-only tools are gated twice: build_tools() only includes their schema
+for admin callers (so the model is never even told the tool exists), and
+call_tool() re-checks is_admin before dispatching, so a bad tool call can
+never reach admin-only data even if it's somehow requested.
+
 Tool errors (ValueError from the underlying service) are turned into an
 {"error": ...} result rather than raised, so a bad tool call becomes
 something the model can see and react to instead of a failed chat request.
@@ -16,77 +21,106 @@ from google.genai import types
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.services import hours_service, vacation_service
+from app.services import hours_service, user_service, vacation_service
 
-TOOLS = [
-    types.Tool(
-        function_declarations=[
-            types.FunctionDeclaration(
-                name="get_my_hours",
-                description=(
-                    "Get the total hours the authenticated employee worked in a "
-                    "given month or year. If year/month are omitted, defaults to "
-                    "the current period."
-                ),
-                parameters_json_schema={
-                    "type": "object",
-                    "properties": {
-                        "period": {
-                            "type": "string",
-                            "enum": ["month", "year"],
-                            "description": "Which period to total hours for.",
-                        },
-                        "year": {
-                            "type": "integer",
-                            "description": "Calendar year. Defaults to the current year.",
-                        },
-                        "month": {
-                            "type": "integer",
-                            "description": (
-                                "Month number (1-12), only used when period is "
-                                "'month'. Defaults to the current month."
-                            ),
-                        },
-                    },
-                    "required": ["period"],
+_EMPLOYEE_DECLARATIONS = [
+    types.FunctionDeclaration(
+        name="get_my_hours",
+        description=(
+            "Get the total hours the authenticated employee worked in a "
+            "given month or year. If year/month are omitted, defaults to "
+            "the current period."
+        ),
+        parameters_json_schema={
+            "type": "object",
+            "properties": {
+                "period": {
+                    "type": "string",
+                    "enum": ["month", "year"],
+                    "description": "Which period to total hours for.",
                 },
-            ),
-            types.FunctionDeclaration(
-                name="get_hours_between",
-                description=(
-                    "Get the total hours the authenticated employee worked between "
-                    "two dates (inclusive), for any arbitrary date range."
-                ),
-                parameters_json_schema={
-                    "type": "object",
-                    "properties": {
-                        "start_date": {
-                            "type": "string",
-                            "format": "date",
-                            "description": "Start of the range, as YYYY-MM-DD.",
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "format": "date",
-                            "description": "End of the range (inclusive), as YYYY-MM-DD.",
-                        },
-                    },
-                    "required": ["start_date", "end_date"],
+                "year": {
+                    "type": "integer",
+                    "description": "Calendar year. Defaults to the current year.",
                 },
-            ),
-            types.FunctionDeclaration(
-                name="get_vacation_balance",
-                description="Get the authenticated employee's remaining vacation days.",
-                parameters_json_schema={"type": "object", "properties": {}},
-            ),
-            types.FunctionDeclaration(
-                name="get_office_hours",
-                description="Get the company's office hours and working days policy.",
-                parameters_json_schema={"type": "object", "properties": {}},
-            ),
-        ]
-    )
+                "month": {
+                    "type": "integer",
+                    "description": (
+                        "Month number (1-12), only used when period is "
+                        "'month'. Defaults to the current month."
+                    ),
+                },
+            },
+            "required": ["period"],
+        },
+    ),
+    types.FunctionDeclaration(
+        name="get_hours_between",
+        description=(
+            "Get the total hours the authenticated employee worked between "
+            "two dates (inclusive), for any arbitrary date range."
+        ),
+        parameters_json_schema={
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Start of the range, as YYYY-MM-DD.",
+                },
+                "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "End of the range (inclusive), as YYYY-MM-DD.",
+                },
+            },
+            "required": ["start_date", "end_date"],
+        },
+    ),
+    types.FunctionDeclaration(
+        name="get_vacation_balance",
+        description="Get the authenticated employee's remaining vacation days.",
+        parameters_json_schema={"type": "object", "properties": {}},
+    ),
+    types.FunctionDeclaration(
+        name="get_office_hours",
+        description="Get the company's office hours and working days policy.",
+        parameters_json_schema={"type": "object", "properties": {}},
+    ),
 ]
+
+_ADMIN_DECLARATIONS = [
+    types.FunctionDeclaration(
+        name="get_employees_hours_report",
+        description=(
+            "Admin only. Get every employee's total worked hours between two "
+            "dates (inclusive). If start_date/end_date are omitted, defaults "
+            "to the current month."
+        ),
+        parameters_json_schema={
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Start of the range, as YYYY-MM-DD. Defaults to the 1st of the current month.",
+                },
+                "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "End of the range (inclusive), as YYYY-MM-DD. Defaults to today.",
+                },
+            },
+        },
+    ),
+]
+
+
+def build_tools(is_admin: bool) -> list[types.Tool]:
+    declarations = list(_EMPLOYEE_DECLARATIONS)
+    if is_admin:
+        declarations += _ADMIN_DECLARATIONS
+    return [types.Tool(function_declarations=declarations)]
 
 
 def get_my_hours(
@@ -137,7 +171,32 @@ def get_office_hours() -> dict:
     }
 
 
-def call_tool(name: str, args: dict, db: Session, user_id: int) -> dict:
+def get_employees_hours_report(
+    db: Session, start_date: str | None = None, end_date: str | None = None
+) -> dict:
+    today = date.today()
+    start = date.fromisoformat(start_date) if start_date else today.replace(day=1)
+    end = date.fromisoformat(end_date) if end_date else today
+    if end < start:
+        raise ValueError("end_date must not be before start_date")
+
+    employees = [
+        {
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "total_hours": hours_service.get_hours_between(db, user.id, start, end),
+        }
+        for user in user_service.list_users(db)
+    ]
+    return {
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "employees": employees,
+    }
+
+
+def call_tool(name: str, args: dict, db: Session, user_id: int, is_admin: bool) -> dict:
     try:
         if name == "get_my_hours":
             return get_my_hours(db, user_id, **args)
@@ -147,6 +206,10 @@ def call_tool(name: str, args: dict, db: Session, user_id: int) -> dict:
             return get_vacation_balance(db, user_id)
         if name == "get_office_hours":
             return get_office_hours()
+        if name == "get_employees_hours_report":
+            if not is_admin:
+                return {"error": "Admin access required for this tool."}
+            return get_employees_hours_report(db, **args)
         return {"error": f"Unknown tool: {name}"}
     except ValueError as exc:
         return {"error": str(exc)}

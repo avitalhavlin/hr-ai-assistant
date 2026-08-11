@@ -39,7 +39,7 @@ def test_chat_returns_reply(client, db_session, monkeypatch):
     monkeypatch.setattr(
         chat_service,
         "send_chat_message",
-        lambda payload, db, user_id: "Hello, how can I help?",
+        lambda payload, db, user_id, is_admin: "Hello, how can I help?",
     )
 
     response = client.post(
@@ -54,7 +54,7 @@ def test_chat_maps_service_error_to_502(client, db_session, monkeypatch):
     _make_user(db_session, email="chaterror@example.com")
     token = _login(client, "chaterror@example.com")
 
-    def _raise(payload, db, user_id):
+    def _raise(payload, db, user_id, is_admin):
         raise chat_service.ChatServiceError("Could not reach the AI service")
 
     monkeypatch.setattr(chat_service, "send_chat_message", _raise)
