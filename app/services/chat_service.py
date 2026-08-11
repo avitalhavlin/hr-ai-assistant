@@ -6,8 +6,8 @@ reply as plain text.
 
 No conversation persistence yet — chat logging lands in Phase 7, so the
 caller is responsible for resending history on each request. No RAG yet
-either (Phase 6), so anything beyond the three tools (hours, vacation
-balance, office hours) is still out of the model's reach.
+either (Phase 6), so anything beyond the tools in app/ai/tools.py is
+still out of the model's reach.
 """
 
 from google.genai import errors, types
@@ -30,7 +30,7 @@ class ChatServiceError(Exception):
     pass
 
 
-def send_chat_message(payload: ChatRequest, db: Session, user_id: int) -> str:
+def send_chat_message(payload: ChatRequest, db: Session, user_id: int, is_admin: bool) -> str:
     if not settings.gemini_api_key:
         raise ChatServiceError("Gemini API key is not configured")
 
@@ -42,7 +42,7 @@ def send_chat_message(payload: ChatRequest, db: Session, user_id: int) -> str:
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         max_output_tokens=1024,
-        tools=tools.TOOLS,
+        tools=tools.build_tools(is_admin),
     )
 
     for _ in range(MAX_TOOL_ROUNDS):
@@ -66,7 +66,9 @@ def send_chat_message(payload: ChatRequest, db: Session, user_id: int) -> str:
                 "parts": [
                     types.Part.from_function_response(
                         name=call.name,
-                        response=tools.call_tool(call.name, call.args or {}, db, user_id),
+                        response=tools.call_tool(
+                            call.name, call.args or {}, db, user_id, is_admin
+                        ),
                     )
                     for call in calls
                 ],

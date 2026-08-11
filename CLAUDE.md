@@ -12,41 +12,54 @@ Phase 5 complete: chatbot tool use. `POST /chat/` (any authenticated user,
 via `app/api/deps.py::get_current_user`, plus a `db: Session =
 Depends(get_db)`) accepts a `message` plus an optional `history` list of
 prior `{role, content}` turns and returns `{"reply": ...}`.
-`app/services/chat_service.py::send_chat_message(payload, db, user_id)`
-runs a tool-calling loop (capped at `MAX_TOOL_ROUNDS = 5`, raising
-`ChatServiceError` if exceeded): it calls `generate_content` with
-`tools=app.ai.tools.TOOLS` in the `GenerateContentConfig`; whenever the
-response carries `response.function_calls`, it appends the model's turn
-plus a `role="user"` turn containing each call's
+`app/services/chat_service.py::send_chat_message(payload, db, user_id,
+is_admin)` runs a tool-calling loop (capped at `MAX_TOOL_ROUNDS = 5`,
+raising `ChatServiceError` if exceeded): it calls `generate_content` with
+`tools=app.ai.tools.build_tools(is_admin)` in the `GenerateContentConfig`;
+whenever the response carries `response.function_calls`, it appends the
+model's turn plus a `role="user"` turn containing each call's
 `types.Part.from_function_response(...)` (that role for function-response
 turns is confirmed against the installed SDK's own automatic-function-
 calling code, not guessed) and loops; once a response has no function
-calls, `response.text` is returned. `app/ai/tools.py` declares the four
-tools' schemas (`types.Tool(function_declarations=[...])`, using
-`parameters_json_schema` — a plain JSON-schema dict — for each) and holds
-`call_tool(name, args, db, user_id)`, which dispatches to
-`get_my_hours`/`get_hours_between`/`get_vacation_balance`/
-`get_office_hours`. Each is a thin wrapper: `get_my_hours` (period
-`month`/`year` only — `week` was dropped in favor of the more flexible
-`get_hours_between`) resolves "current period" defaults from
-`date.today()` when the model omits year/month, then calls
-`hours_service.get_hours_for_month/year`; `get_hours_between` takes
-arbitrary `start_date`/`end_date` (`YYYY-MM-DD` strings, parsed with
-`date.fromisoformat`) and calls `hours_service.get_hours_between`
-directly, for any date range the week/month/year shortcuts don't cover;
-`get_vacation_balance` calls the new `vacation_service.get_vacation_balance`
-(wraps
+calls, `response.text` is returned. `app/ai/tools.py` declares the tool
+schemas (`types.Tool(function_declarations=[...])`, using
+`parameters_json_schema` — a plain JSON-schema dict — for each), split
+into `_EMPLOYEE_DECLARATIONS` (always offered) and `_ADMIN_DECLARATIONS`
+(only appended by `build_tools` when `is_admin`) — a non-admin caller's
+model is never even told the admin tool exists. `call_tool(name, args,
+db, user_id, is_admin)` dispatches to `get_my_hours`/`get_hours_between`/
+`get_vacation_balance`/`get_office_hours`/`get_employees_hours_report`.
+Each is a thin wrapper: `get_my_hours` (period `month`/`year` only —
+`week` was dropped in favor of the more flexible `get_hours_between`)
+resolves "current period" defaults from `date.today()` when the model
+omits year/month, then calls `hours_service.get_hours_for_month/year`;
+`get_hours_between` takes arbitrary `start_date`/`end_date` (`YYYY-MM-DD`
+strings, parsed with `date.fromisoformat`) and calls
+`hours_service.get_hours_between` directly, for any date range the
+month/year shortcut doesn't cover; `get_vacation_balance` calls
+`vacation_service.get_vacation_balance` (wraps
 `employee_profile_repository.get_by_user_id`, returns `None` if the user
 has no profile yet); `get_office_hours` just reads
-`settings.office_open_time`/`office_close_time`/`working_days`. Tool
-`db`/`user_id` are always server-bound by `chat_service.py`, never
-model-settable parameters — the model can't act on another user's data.
-A `ValueError` from a tool (e.g. an invalid month) is caught in
+`settings.office_open_time`/`office_close_time`/`working_days`;
+`get_employees_hours_report` (admin-only — `call_tool` re-checks
+`is_admin` and returns `{"error": "Admin access required for this
+tool."}` rather than raising if it's somehow reached anyway, as
+defense-in-depth alongside the schema being withheld) lists every user
+via `user_service.list_users` and calls `hours_service.get_hours_between`
+per user for the (optionally defaulted-to-current-month) range — the
+per-user loop lives in `tools.py`, not a new `hours_service` function,
+same "orchestration, not domain logic" reasoning as `get_my_hours`'s
+period defaulting. Tool `db`/`user_id`/`is_admin` are always server-bound
+by `chat_service.py` (computed once in `app/api/chat.py` from
+`current.id`/`current.role == Role.admin`), never model-settable
+parameters — the model can't act on another user's data or claim admin
+access. A `ValueError` from a tool (e.g. an invalid month) is caught in
 `call_tool` and turned into `{"error": ...}` returned to the model,
 rather than raised, so a bad tool call doesn't fail the whole chat
 request. `app/ai/prompts.py`'s `SYSTEM_PROMPT` now tells the model to use
-these tools rather than guess real numbers, while still disclaiming
-policy documents beyond office hours (RAG is Phase 6) and chat logging
+these tools rather than guess real numbers, mentions the admin-only
+report tool, while still disclaiming policy documents beyond office
+hours (RAG is Phase 6) and chat logging
 (Phase 7). Any `google.genai.errors.APIError` from the SDK is still
 caught in the service, re-raised as `ChatServiceError`, and mapped to a
 502 in the route — same as Phase 4.

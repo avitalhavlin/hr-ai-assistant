@@ -61,7 +61,9 @@ def test_send_chat_message_single_turn(db_session, monkeypatch):
     fake_client = _FakeClient([_text_response("Hello there!")])
     monkeypatch.setattr(chat_service, "get_client", lambda: fake_client)
 
-    reply = chat_service.send_chat_message(ChatRequest(message="Hi"), db_session, user.id)
+    reply = chat_service.send_chat_message(
+        ChatRequest(message="Hi"), db_session, user.id, is_admin=False
+    )
 
     assert reply == "Hello there!"
     assert fake_client.models.calls[0]["contents"] == [
@@ -82,7 +84,7 @@ def test_send_chat_message_includes_history(db_session, monkeypatch):
         ],
     )
 
-    chat_service.send_chat_message(payload, db_session, user.id)
+    chat_service.send_chat_message(payload, db_session, user.id, is_admin=False)
 
     assert fake_client.models.calls[0]["contents"] == [
         {"role": "user", "parts": [{"text": "What's my vacation balance?"}]},
@@ -102,7 +104,7 @@ def test_send_chat_message_runs_a_tool_call_and_returns_final_text(db_session, m
     monkeypatch.setattr(chat_service, "get_client", lambda: fake_client)
 
     reply = chat_service.send_chat_message(
-        ChatRequest(message="What are the office hours?"), db_session, user.id
+        ChatRequest(message="What are the office hours?"), db_session, user.id, is_admin=False
     )
 
     assert reply == "Office hours are 09:00 to 18:00."
@@ -116,6 +118,25 @@ def test_send_chat_message_runs_a_tool_call_and_returns_final_text(db_session, m
     assert function_response.response["open_time"] == settings.office_open_time
 
 
+def test_send_chat_message_offers_admin_tool_only_when_is_admin(db_session, monkeypatch):
+    user = _make_user(db_session)
+    fake_client = _FakeClient([_text_response("ok"), _text_response("ok")])
+    monkeypatch.setattr(chat_service, "get_client", lambda: fake_client)
+
+    chat_service.send_chat_message(ChatRequest(message="Hi"), db_session, user.id, is_admin=False)
+    chat_service.send_chat_message(ChatRequest(message="Hi"), db_session, user.id, is_admin=True)
+
+    def _declared_names(call_kwargs):
+        return {
+            fd.name
+            for t in call_kwargs["config"].tools
+            for fd in t.function_declarations
+        }
+
+    assert "get_employees_hours_report" not in _declared_names(fake_client.models.calls[0])
+    assert "get_employees_hours_report" in _declared_names(fake_client.models.calls[1])
+
+
 def test_send_chat_message_raises_when_tool_calls_never_stop(db_session, monkeypatch):
     user = _make_user(db_session)
     responses = [_function_call_response("get_office_hours", {}) for _ in range(10)]
@@ -123,7 +144,9 @@ def test_send_chat_message_raises_when_tool_calls_never_stop(db_session, monkeyp
     monkeypatch.setattr(chat_service, "get_client", lambda: fake_client)
 
     with pytest.raises(chat_service.ChatServiceError):
-        chat_service.send_chat_message(ChatRequest(message="Hi"), db_session, user.id)
+        chat_service.send_chat_message(
+            ChatRequest(message="Hi"), db_session, user.id, is_admin=False
+        )
 
 
 def test_send_chat_message_raises_service_error_on_api_error(db_session, monkeypatch):
@@ -138,7 +161,9 @@ def test_send_chat_message_raises_service_error_on_api_error(db_session, monkeyp
     )
 
     with pytest.raises(chat_service.ChatServiceError):
-        chat_service.send_chat_message(ChatRequest(message="Hi"), db_session, user.id)
+        chat_service.send_chat_message(
+            ChatRequest(message="Hi"), db_session, user.id, is_admin=False
+        )
 
 
 def test_send_chat_message_raises_service_error_when_key_missing(db_session, monkeypatch):
@@ -146,4 +171,6 @@ def test_send_chat_message_raises_service_error_when_key_missing(db_session, mon
     monkeypatch.setattr(settings, "gemini_api_key", "")
 
     with pytest.raises(chat_service.ChatServiceError):
-        chat_service.send_chat_message(ChatRequest(message="Hi"), db_session, user.id)
+        chat_service.send_chat_message(
+            ChatRequest(message="Hi"), db_session, user.id, is_admin=False
+        )
